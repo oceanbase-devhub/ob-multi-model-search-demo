@@ -12,6 +12,8 @@ from pyobvector import *
 from sqlalchemy import Column, Integer, String, JSON, Index
 from sqlalchemy.dialects.mysql import LONGTEXT
 from tqdm import tqdm
+import dashscope
+from http import HTTPStatus
 
 DEFAULT_OBMMS_TABLE_NAME = "obmms_demo"
 logger = logging.getLogger(__name__)
@@ -40,19 +42,14 @@ def geocode(address):
 
 
 def embedding(query: List[str]):
-    res = requests.post(
-        os.environ.get("REMOTE_BGE_URL", ""),
-        json={"model": "bge-m3", "input": query},
-        headers={
-            "X-Token": os.environ.get("REMOTE_BGE_TOKEN", "")
-        },
+    res = dashscope.TextEmbedding.call(
+        model=dashscope.TextEmbedding.Models.text_embedding_v3,
+        input=query,
     )
-    data = res.json()
-    if len(query) == 1:
-        return [data["embeddings"]]
+    if res.status_code == HTTPStatus.OK:
+        return [eb['embedding'] for eb in res.output['embeddings']]
     else:
-        return data["embeddings"]
-
+        raise ValueError(f"embedding error: {res}")
 
 def parse_season_str(season_str: str) -> int:
     if "四季" in season_str or "全年" in season_str:
@@ -119,17 +116,22 @@ def load_csv(csv_path: str):
     for _, record in tqdm(df.iterrows(), total=df.shape[0]):
         if pd.isna(record["介绍"]) or pd.isna(record["图片链接"]):
             continue
-
+        
         season_str = "四季皆宜" if pd.isna(record["建议季节"]) else record["建议季节"]
         match = re.search(pattern, str(record["地址"]), re.DOTALL)
         if not match:
             continue
         geo_str = match.group(1)
+
+        try:
+            lat_long = geocode(geo_str)
+        except Exception:
+            continue
         
         data = {
             "attraction_name": record["名字"],
             "address_text": record["地址"],
-            "address": ST_GeomFromText(geocode(geo_str), 4326),
+            "address": ST_GeomFromText(lat_long, 4326),
             "intro": record["介绍"],
             "intro_vec": embedding([record["介绍"]])[0],
             "img_url": record["图片链接"],
@@ -143,4 +145,9 @@ def load_csv(csv_path: str):
 
 if __name__ == "__main__":
     create_obmms_table()
+    # for root, _, files in os.walk("../../citydata"):
+    #     for file in files:
+    #         file_path = os.path.join(root, file)
+    #         print(f"{file_path}:")
+    #         load_csv(file_path)
     load_csv("../../citydata/杭州.csv")

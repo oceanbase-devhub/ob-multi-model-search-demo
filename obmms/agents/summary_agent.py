@@ -33,6 +33,7 @@ class SummaryAgent(Agent):
                 pure_user_content=user_content,
                 use_for_history=False,
             )
+            logger.info(f"################################### {resp}")
             if ret_code == 200:
                 break
             retry_cnt += 1

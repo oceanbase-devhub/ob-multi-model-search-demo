@@ -45,6 +45,7 @@ class ConsultAgent(Agent):
 
         retry_cnt = 0
         while retry_cnt < self.DEFAULT_RETRY_COUNT:
+            # print(f"{chat_history} {prompted_message} {user_content}")
             ret_code, resp, _ = self.llm.multi_chat(
                 messages=chat_history,
                 user_content=prompted_message,

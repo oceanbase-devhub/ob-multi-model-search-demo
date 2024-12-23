@@ -1,5 +1,6 @@
 import re
-from typing import Dict, List, Any
+import time
+from typing import Dict, List, Any, Optional, Tuple
 from ..prompt import plan_prompt
 from .agent import Agent
 from ..llm import TongyiLLMConfig, TongyiLLM
@@ -39,23 +40,40 @@ class PlanAgent(Agent):
         chat_history: List[dict],
         summary: str,
         user_content: str,
-        **kwargs
-    ) -> str:
+        str_list: Optional[List[str]] = None,
+        result_column_names: Optional[List] = None,
+        result_rows: Optional[List[Tuple]] = None,
+    ):
+        start_time = time.time()
         res = self.tool.call(
             necessary_info=necessary_info,
             summary=summary,
+            str_list=str_list,
         )
+        end_time = time.time()
+
+        if result_column_names is not None:
+            result_column_names.extend(res.keys())
 
         attraction_infos = ""
         geos = None
         idx = 1
         for r in res.fetchall():
+            if result_rows is not None:
+                result_rows.append(r)
             if geos is None:
                 geos = []
             info = ''.join([str(col) for col in (list(r))[:-1]])
             geos.append(PlanAgent.extract_floats(str((list(r))[-1])))
             attraction_infos += f"景点{idx}: {info}\n\n"
             idx += 1
+        
+        if len(attraction_infos) == 0:
+            attraction_infos = "不存在可选旅行景点"
+        
+        print("\n===================================\n")
+        print(attraction_infos)
+        print("\n===================================\n")
 
         prompted_message = plan_prompt.format(
             option_attractions=attraction_infos,
@@ -69,7 +87,7 @@ class PlanAgent(Agent):
                 messages=chat_history,
                 user_content=prompted_message,
                 pure_user_content=user_content,
-            ), geos
+            ), geos, end_time - start_time
         
         retry_cnt = 0
         while retry_cnt < self.DEFAULT_RETRY_COUNT:
@@ -84,4 +102,4 @@ class PlanAgent(Agent):
 
         if ret_code != 200:
             raise ValueError(f"failed to chat with LLM: err-{ret_code}")
-        return resp, geos
+        return resp, geos, end_time - start_time

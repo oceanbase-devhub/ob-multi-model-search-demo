@@ -3,10 +3,12 @@ import re
 import requests
 import json
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from pyobvector import ObVecClient, ST_GeomFromText, st_dwithin
 from .tool import Tool
 from sqlalchemy import Table, func, and_, text
+import dashscope
+from http import HTTPStatus
 
 DEFAULT_DEPATURE_NAME = "departure"
 DEFAULT_DISTANCE_NAME = "distance"
@@ -35,15 +37,14 @@ class ObMMSTool(Tool):
     
     @classmethod
     def embedding(cls, query: str):
-        res = requests.post(
-            os.environ.get("REMOTE_BGE_URL", ""),
-            json={"model": "bge-m3", "input": query},
-            headers={
-                "X-Token": os.environ.get("REMOTE_BGE_TOKEN", "")
-            },
+        res = dashscope.TextEmbedding.call(
+            model=dashscope.TextEmbedding.Models.text_embedding_v3,
+            input=[query],
         )
-        data = res.json()
-        return data["embeddings"][0]
+        if res.status_code == HTTPStatus.OK:
+            return [eb['embedding'] for eb in res.output['embeddings']][0]
+        else:
+            raise ValueError(f"embedding error: {res}")
 
     @classmethod
     def parse_season_str(cls, season_str: str) -> int:
@@ -71,12 +72,14 @@ class ObMMSTool(Tool):
         url = 'https://restapi.amap.com/v3/geocode/geo'
         res = requests.get(url, params)
         result = json.loads(res.text)
+        print(result)
         long_lat_strs = result['geocodes'][0]['location'].split(",")
         return (float(long_lat_strs[1]), float(long_lat_strs[0]))
     
     @classmethod
     def parse_distance(cls, distance_str) -> float:
         import re
+        print(f"=================== distance: {distance_str}")
         match = re.match(r'([\d.]+)([a-zA-Z]+)', distance_str)
         if not match:
             raise ValueError("Invalid distance format")
@@ -99,6 +102,7 @@ class ObMMSTool(Tool):
         self,
         necessary_info: Dict[str, Any],
         summary: str,
+        str_list: Optional[List[str]] = None,
         **kwargs
     ) -> Dict:
         departure = ObMMSTool.geocode(necessary_info[self.departure_name])
@@ -121,7 +125,7 @@ class ObMMSTool(Tool):
             ),
         ]
 
-        res = self.client.ann_search(
+        res = self.client.post_ann_search(
             table_name=self.table_name,
             vec_data=summary_vec,
             vec_column_name="intro_vec",
@@ -137,7 +141,8 @@ class ObMMSTool(Tool):
                 "ticket",
             ],
             extra_output_cols=[text("st_astext(address)")],
-            where_clause=where_clause
+            where_clause=where_clause,
+            str_list=str_list,
         )
 
         return res
