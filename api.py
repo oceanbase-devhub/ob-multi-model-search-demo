@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -25,12 +26,13 @@ async def chat(req: Request):
         season=req.season,
     )
     streamer, chat_resp = await agent_flow.chat(req.new_input)
-
+    async def convert_to_async_iterator():
+        for res in streamer:
+            yield await asyncio.to_thread(lambda: f"data:{res.output.choices[0].message.content}\n\n")
     async def do_stream():
         yield f"meta:{chat_resp.model_dump_json()}\n\n"
         if streamer is not None:
-            for res in streamer:
-                # msg.append(res.output.choices[0].message.content)
-                yield f"data:{res.output.choices[0].message.content}\n\n"
+            async for res in convert_to_async_iterator():
+                yield res
         
     return StreamingResponse(do_stream(), media_type="text/event-stream")
