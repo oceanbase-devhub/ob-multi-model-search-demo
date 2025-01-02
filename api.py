@@ -18,20 +18,19 @@ class Request(BaseModel):
 @app.post("/obmms/chat")
 async def chat(req: Request):
     agent_flow = StatelessAgentFlow(
-        table_name="obmms_demo",
-        topk=20,
         chat_history=req.messages,
         departure=req.departure,
         distance=req.distance,
         score=req.score,
         season=req.season,
     )
-    streamer, chat_resp = agent_flow.chat(req.new_input)
+    streamer, chat_resp = await agent_flow.chat(req.new_input)
 
     async def do_stream():
         yield f"meta:{chat_resp.model_dump_json()}\n\n"
-        for res in streamer:
-            # msg.append(res.output.choices[0].message.content)
-            yield f"data:{res.output.choices[0].message.content}\n\n"
+        if streamer is not None:
+            for res in streamer:
+                # msg.append(res.output.choices[0].message.content)
+                yield f"data:{res.output.choices[0].message.content}\n\n"
         
     return StreamingResponse(do_stream(), media_type="text/event-stream")

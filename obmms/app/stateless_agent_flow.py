@@ -24,18 +24,34 @@ class Response(BaseModel):
     score: Optional[int] = Field(None, description="前端保存的景点评分")
     season: Optional[str] = Field(None, description="前端保存的季节要求")
 
+
+extract_agent = ExtractAgent(is_async=True)
+consult_agent = ConsultAgent(enable_stream=True, is_async=True)
+summary_agent = SummaryAgent(is_async=True)
+obmms_tool = ObMMSTool(
+    table_name="obmms_demo",
+    topk=20,
+    pool_size=10,
+    max_overflow=5,
+    pool_timeout=30,
+    pool_recycle=1800,
+)
+plan_agent = PlanAgent(
+    obmms_tool=obmms_tool,
+    enable_stream=True,
+    is_async=True,
+    search_only=True,
+)
+
 class StatelessAgentFlow:
     def __init__(
         self,
-        table_name: str,
-        topk: int,
         chat_history: List[dict],
         # stat: AgentStat,
         departure: Optional[str] = None,
         distance: Optional[str] = None,
         score: Optional[int] = None,
         season: Optional[str] = None,
-        echo: bool = False,
     ):
         self.departure_name = "departure"
         self.distance_name = "distance"
@@ -62,19 +78,6 @@ class StatelessAgentFlow:
             self.score_name: score,
             self.season_name: season,
         }
-
-        self.extract_agent = ExtractAgent()
-        self.consult_agent = ConsultAgent(enable_stream=True)
-        self.summary_agent = SummaryAgent()
-        self.obmms_tool = ObMMSTool(
-            table_name=table_name,
-            topk=topk,
-            echo=echo,
-        )
-        self.plan_agent = PlanAgent(
-            obmms_tool=self.obmms_tool,
-            enable_stream=True,
-        )
 
     @classmethod
     def parse_season_str(cls, season_str: str) -> int:
@@ -133,20 +136,20 @@ class StatelessAgentFlow:
     def replace_folded_vectors(self, text):
         return re.sub(r'\'\[.*?\]\'', '<FOLDED VECTOR DATA>', text)
 
-    def chat(self, user_content: str):
+    async def chat(self, user_content: str):
         chat_resp = Response()
         summary_resp = ""
 
         while True:
             if self.stat == AgentStat.STAT_EXTRACT:
-                new_json = self.extract_agent.chat(
+                new_json = await extract_agent.achat(
                     user_content=user_content
                 )
                 self.update_user_info(new_json=new_json)
                 self.set_next_stat()
                 continue
             elif self.stat == AgentStat.STAT_CONSULT:
-                streamer = self.consult_agent.chat(
+                streamer = await consult_agent.achat(
                     necessay_list=self.get_none_user_info_keys(),
                     chat_history=self.chat_history,
                     user_content=user_content,
@@ -154,7 +157,7 @@ class StatelessAgentFlow:
                 
                 # chat_resp.reply = self.chat_history[-1]
                 if self.user_info[self.departure_name] is not None:
-                    lat, long = self.obmms_tool.geocode(self.user_info[self.departure_name])
+                    lat, long = obmms_tool.geocode(self.user_info[self.departure_name])
                     chat_resp.lats = [lat]
                     chat_resp.longs = [long]
                 chat_resp.departure = self.user_info[self.departure_name]
@@ -163,7 +166,7 @@ class StatelessAgentFlow:
                 chat_resp.season = self.user_info[self.season_name]
                 return streamer, chat_resp
             elif self.stat == AgentStat.STAT_SUMMARY:
-                summary_resp = self.summary_agent.chat(
+                summary_resp = await summary_agent.achat(
                     chat_history=self.chat_history,
                     user_content=user_content,
                 )
@@ -174,7 +177,7 @@ class StatelessAgentFlow:
                 result_column_names = []
                 result_rows = []
 
-                streamer, geos, _ = self.plan_agent.chat(
+                _, geos, _ = await plan_agent.achat(
                     necessary_info=self.user_info,
                     chat_history=self.chat_history,
                     summary=summary_resp,
@@ -206,5 +209,5 @@ class StatelessAgentFlow:
                 chat_resp.distance = self.user_info[self.distance_name]
                 chat_resp.score = self.user_info[self.score_name]
                 chat_resp.season = self.user_info[self.season_name]
-                return streamer, chat_resp
+                return None, chat_resp
         

@@ -26,9 +26,10 @@ class ObMMSTool(Tool):
         distance_name: str = DEFAULT_DISTANCE_NAME,
         score_name: str = DEFAULT_SCORE_NAME,
         season_name: str = DEFAULT_SEASON_NAME,
+        **kwargs,
     ):
         self.table_name = table_name
-        self.client = ObVecClient(echo=echo)
+        self.client = ObVecClient(echo=echo, **kwargs)
         self.topk = topk
         self.departure_name = departure_name
         self.distance_name = distance_name
