@@ -3,6 +3,9 @@ import dashscope
 # from config import RagConfig
 from typing import List
 from .llm import LLM, LLMConfig
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TongyiLLMConfig(LLMConfig):
     """"""
@@ -23,6 +26,7 @@ class TongyiLLM(LLM):
             top_p=self._config.top_p,
             temperature=self._config.temperature,
         )
+        logger.info(f"Tongyi LLM response: {response}")
         return response
         # if response.status_code == 200:
         #     return response.output.text

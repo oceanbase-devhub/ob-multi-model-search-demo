@@ -1,6 +1,7 @@
 import os
 import re
 import requests
+import time
 import json
 import logging
 from typing import Dict, List, Any, Optional
@@ -9,12 +10,20 @@ from .tool import Tool
 from sqlalchemy import Table, func, and_, text
 import dashscope
 from http import HTTPStatus
+import dotenv
 
 DEFAULT_DEPATURE_NAME = "departure"
 DEFAULT_DISTANCE_NAME = "distance"
 DEFAULT_SCORE_NAME = "score"
 DEFAULT_SEASON_NAME = "season"
 logger = logging.getLogger(__name__)
+# file_handler = logging.FileHandler('./log/app.log')
+# file_handler.setLevel(logging.INFO)
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
+
+dotenv.load_dotenv()
 
 class ObMMSTool(Tool):
     def __init__(
@@ -29,7 +38,24 @@ class ObMMSTool(Tool):
         **kwargs,
     ):
         self.table_name = table_name
-        self.client = ObVecClient(echo=echo, **kwargs)
+        connect_args = {
+            "ssl": {
+                "ca": os.getenv("OB_DB_SSL_CA_PATH", ""),
+                "check_hostname": False,
+            }
+        }
+        uri = os.getenv("OB_URL", "127.0.0.1:2881")
+        user = os.getenv("OB_USER", "root@test")
+        db_name = os.getenv("OB_DB_NAME", "test")
+        pwd = os.getenv("OB_PWD", "")
+        self.client = ObVecClient(
+            uri=uri,
+            user=user,
+            password=pwd,
+            db_name=db_name,
+            connect_args=connect_args,
+            echo=echo, **kwargs
+        )
         self.topk = topk
         self.departure_name = departure_name
         self.distance_name = distance_name
@@ -71,16 +97,22 @@ class ObMMSTool(Tool):
             'key': os.environ.get("AMAP_API_KEY", ""),
         }
         url = 'https://restapi.amap.com/v3/geocode/geo'
-        res = requests.get(url, params)
-        result = json.loads(res.text)
-        print(result)
-        long_lat_strs = result['geocodes'][0]['location'].split(",")
-        return (float(long_lat_strs[1]), float(long_lat_strs[0]))
+        while True:
+            res = requests.get(url, params)
+            result = json.loads(res.text)
+            try:
+                long_lat_strs = result['geocodes'][0]['location'].split(",")
+                return (float(long_lat_strs[1]), float(long_lat_strs[0]))
+            except KeyError:
+                if result['info'] == 'CUQPS_HAS_EXCEEDED_THE_LIMIT':
+                    time.sleep(1)
+                    continue
+                else:
+                    raise KeyError(f"{address} {res} {result}")
     
     @classmethod
     def parse_distance(cls, distance_str) -> float:
         import re
-        print(f"=================== distance: {distance_str}")
         match = re.match(r'([\d.]+)([a-zA-Z]+)', distance_str)
         if not match:
             raise ValueError("Invalid distance format")
@@ -136,7 +168,7 @@ class ObMMSTool(Tool):
             output_column_names=[
                 "attraction_name",
                 "address_text",
-                "intro",
+                # "intro",
                 "score",
                 "season",
                 "ticket",

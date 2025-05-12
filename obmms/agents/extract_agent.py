@@ -8,7 +8,12 @@ import logging
 import json
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+# file_handler = logging.FileHandler('./log/app.log')
+# file_handler.setLevel(logging.INFO)
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
+# logger.setLevel(logging.DEBUG)
 
 class ExtractAgent(Agent):
     def __init__(self, is_async: bool = False):
@@ -38,7 +43,7 @@ class ExtractAgent(Agent):
             user_info=user_content,
         )
 
-        logger.debug(prompted_message)
+        logger.info(prompted_message)
 
         retry_cnt = 0
         while retry_cnt < self.DEFAULT_RETRY_COUNT:
@@ -49,7 +54,7 @@ class ExtractAgent(Agent):
             if resp.status_code == 200:
                 try:
                     json_str = str(resp.output.text).replace(" ", "").replace("\n", "")
-                    logger.debug(f"============ resp: {json_str}")
+                    logger.info(f"============ resp: {json_str}")
                     res = json.loads(json_str)
                     break
                 except Exception as e:
@@ -58,7 +63,7 @@ class ExtractAgent(Agent):
                 retry_cnt += 1
 
         if resp.status_code != 200:
-            raise ValueError(f"failed to chat with LLM: err-{resp.status_code}")
+            raise ValueError(f"failed to chat with LLM: err-{resp.status_code}: {resp.message}")
         
         if retry_cnt >= self.DEFAULT_RETRY_COUNT:
             raise ValueError(f"failed to parse result to JSON")

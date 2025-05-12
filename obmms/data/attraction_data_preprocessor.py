@@ -7,6 +7,8 @@ import random
 import logging
 import re
 import time
+import dotenv
+import traceback
 
 from pyobvector import *
 from sqlalchemy import Column, Integer, String, JSON, Index
@@ -14,6 +16,8 @@ from sqlalchemy.dialects.mysql import LONGTEXT
 from tqdm import tqdm
 import dashscope
 from http import HTTPStatus
+
+dotenv.load_dotenv()
 
 DEFAULT_OBMMS_TABLE_NAME = "obmms_demo"
 logger = logging.getLogger(__name__)
@@ -69,7 +73,20 @@ def parse_season_str(season_str: str) -> int:
 
 
 def create_obmms_table():
-    client = ObVecClient()
+    connect_args = {
+        "ssl_ca": os.getenv("OB_DB_SSL_CA_PATH", ""),
+    }
+    uri = os.getenv("OB_URL", "127.0.0.1:2881")
+    user = os.getenv("OB_USER", "root@test")
+    db_name = os.getenv("OB_DB_NAME", "test")
+    pwd = os.getenv("OB_PWD", "")
+    client = ObVecClient(
+        uri=uri,
+        user=user,
+        password=pwd,
+        db_name=db_name,
+        connect_args=connect_args,
+    )
     if client.check_table_exists(table_name=DEFAULT_OBMMS_TABLE_NAME):
         return
     
@@ -108,8 +125,21 @@ def create_obmms_table():
     )
 
 
-def load_csv(csv_path: str):
-    client = ObVecClient()
+def load_csv(csv_path: str, delete_after_loaded: bool = False):
+    connect_args = {
+        "ssl_ca": os.getenv("OB_DB_SSL_CA_PATH", "")
+    }
+    uri = os.getenv("OB_URL", "127.0.0.1:2881")
+    user = os.getenv("OB_USER", "root@test")
+    db_name = os.getenv("OB_DB_NAME", "test")
+    pwd = os.getenv("OB_PWD", "")
+    client = ObVecClient(
+        uri=uri,
+        user=user,
+        password=pwd,
+        db_name=db_name,
+        connect_args=connect_args,
+    )
     df = pd.read_csv(csv_path)
 
     pattern = r'地址:\n(.*?)\n'
@@ -141,13 +171,19 @@ def load_csv(csv_path: str):
             "ticket": None if pd.isna(record["门票"]) else record["门票"]
         }
         client.insert(table_name=DEFAULT_OBMMS_TABLE_NAME, data=data)
+    
+    if delete_after_loaded:
+        try:
+            os.remove(csv_path)
+        except Exception:
+            traceback.print_exc()
 
 
 if __name__ == "__main__":
     create_obmms_table()
-    # for root, _, files in os.walk("../../citydata"):
-    #     for file in files:
-    #         file_path = os.path.join(root, file)
-    #         print(f"{file_path}:")
-    #         load_csv(file_path)
-    load_csv("../../citydata/杭州.csv")
+    for root, _, files in os.walk("./citydata"):
+        for file in files:
+            file_path = os.path.join(root, file)
+            print(f"{file_path}:")
+            load_csv(file_path, delete_after_loaded=True)
+    # load_csv("./citydata/杭州.csv")

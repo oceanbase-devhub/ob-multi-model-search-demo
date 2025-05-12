@@ -1,2 +1,8 @@
 poetry.lock
 __pycache__
+__MACOSX
+citydata
+citydata.zip
+log
+nohup.out
+.env

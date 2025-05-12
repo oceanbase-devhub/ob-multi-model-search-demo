@@ -2,7 +2,7 @@
 
 ## Setup
 
-1. Deply a standalone OceanBase server with docker:
+1. Deploy a standalone OceanBase server with docker:
 
 ```bash
 docker run --name=ob433 -e MODE=mini -e OB_MEMORY_LIMIT=8G -e OB_DATAFILE_SIZE=10G -e OB_CLUSTER_NAME=ailab2024_dbgpt -e OB_SERVER_IP=127.0.0.1 -p 2881:2881 -d quay.io/oceanbase/oceanbase-ce:4.3.3.1-101000012024102216

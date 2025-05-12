@@ -7,7 +7,11 @@ from ..llm import TongyiLLMConfig, TongyiLLM
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+# file_handler = logging.FileHandler('./log/app.log')
+# file_handler.setLevel(logging.INFO)
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
 
 class SummaryAgent(Agent):
     def __init__(self, is_async: bool = False):
@@ -38,7 +42,7 @@ class SummaryAgent(Agent):
             user_content=user_content,
         )
 
-        logger.debug(prompted_message)
+        logger.info(prompted_message)
 
         retry_cnt = 0
         while retry_cnt < self.DEFAULT_RETRY_COUNT:
@@ -49,7 +53,7 @@ class SummaryAgent(Agent):
                 user_content,
                 False,
             )
-            logger.debug(f"################################### {resp}")
+            logger.info(f"################################### {resp}")
             if ret_code == 200:
                 break
             retry_cnt += 1

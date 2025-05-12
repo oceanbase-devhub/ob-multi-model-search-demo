@@ -1,9 +1,17 @@
 import asyncio
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
+import logging
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from obmms import AgentStat, StatelessAgentFlow
+
+logger = logging.getLogger(__name__)
+# file_handler = logging.FileHandler('./log/app.log')
+# file_handler.setLevel(logging.INFO)
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
 
 app = FastAPI()
 

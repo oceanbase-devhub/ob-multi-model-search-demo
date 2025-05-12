@@ -9,10 +9,15 @@ from ..tools import ObMMSTool
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+# file_handler = logging.FileHandler('./log/app.log')
+# file_handler.setLevel(logging.INFO)
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
 
 class Response(BaseModel):
     # next_stat: int = Field(description="告知前端下一次的状态码")
+    success: bool = Field(True, description="是否成功执行一次交互")
     reply: str = Field('', description="本轮大模型输出")
     need_reset: bool = Field(False, description="前端是否需要重置历史对话")
     sql: Optional[str] = Field(None, description="如果本次回复使用了SQL，会通过这个字段返回")
@@ -23,25 +28,6 @@ class Response(BaseModel):
     distance: Optional[str] = Field(None, description="前端保存的行程范围")
     score: Optional[int] = Field(None, description="前端保存的景点评分")
     season: Optional[str] = Field(None, description="前端保存的季节要求")
-
-
-extract_agent = ExtractAgent(is_async=True)
-consult_agent = ConsultAgent(enable_stream=True, is_async=True)
-summary_agent = SummaryAgent(is_async=True)
-obmms_tool = ObMMSTool(
-    table_name="obmms_demo",
-    topk=20,
-    pool_size=10,
-    max_overflow=5,
-    pool_timeout=30,
-    pool_recycle=1800,
-)
-plan_agent = PlanAgent(
-    obmms_tool=obmms_tool,
-    enable_stream=True,
-    is_async=True,
-    search_only=True,
-)
 
 class StatelessAgentFlow:
     def __init__(
@@ -78,6 +64,20 @@ class StatelessAgentFlow:
             self.score_name: score,
             self.season_name: season,
         }
+
+        self.extract_agent = ExtractAgent(is_async=True)
+        self.consult_agent = ConsultAgent(enable_stream=True, is_async=True)
+        self.summary_agent = SummaryAgent(is_async=True)
+        self.obmms_tool = ObMMSTool(
+            table_name="obmms_demo",
+            topk=20,
+        )
+        self.plan_agent = PlanAgent(
+            obmms_tool=self.obmms_tool,
+            enable_stream=True,
+            is_async=True,
+            search_only=True,
+        )
 
     @classmethod
     def parse_season_str(cls, season_str: str) -> int:
@@ -142,34 +142,57 @@ class StatelessAgentFlow:
 
         while True:
             if self.stat == AgentStat.STAT_EXTRACT:
-                new_json = await extract_agent.achat(
-                    user_content=user_content
-                )
+                try:
+                    new_json = await self.extract_agent.achat(
+                        user_content=user_content
+                    )
+                except Exception as e:
+                    chat_resp.success = False
+                    chat_resp.reply = str(e)
+                    return None, chat_resp
+
                 self.update_user_info(new_json=new_json)
                 self.set_next_stat()
                 continue
             elif self.stat == AgentStat.STAT_CONSULT:
-                streamer = await consult_agent.achat(
-                    necessay_list=self.get_none_user_info_keys(),
-                    chat_history=self.chat_history,
-                    user_content=user_content,
-                )
-                
+                try:
+                    streamer = await self.consult_agent.achat(
+                        necessay_list=self.get_none_user_info_keys(),
+                        chat_history=self.chat_history,
+                        user_content=user_content,
+                    )
+                except Exception as e:
+                    chat_resp.success = False
+                    chat_resp.reply = str(e)
+                    return None, chat_resp
+
                 # chat_resp.reply = self.chat_history[-1]
                 if self.user_info[self.departure_name] is not None:
-                    lat, long = obmms_tool.geocode(self.user_info[self.departure_name])
+                    try:
+                        lat, long = self.obmms_tool.geocode(self.user_info[self.departure_name])
+                    except Exception as e:
+                        chat_resp.success = False
+                        chat_resp.reply = str(e)
+                        return None, chat_resp
                     chat_resp.lats = [lat]
                     chat_resp.longs = [long]
+                
                 chat_resp.departure = self.user_info[self.departure_name]
                 chat_resp.distance = self.user_info[self.distance_name]
                 chat_resp.score = self.user_info[self.score_name]
                 chat_resp.season = self.user_info[self.season_name]
                 return streamer, chat_resp
             elif self.stat == AgentStat.STAT_SUMMARY:
-                summary_resp = await summary_agent.achat(
-                    chat_history=self.chat_history,
-                    user_content=user_content,
-                )
+                try:
+                    summary_resp = await self.summary_agent.achat(
+                        chat_history=self.chat_history,
+                        user_content=user_content,
+                    )
+                except Exception as e:
+                    chat_resp.success = False
+                    chat_resp.reply = str(e)
+                    return None, chat_resp
+
                 self.set_next_stat()
                 continue
             elif self.stat == AgentStat.STAT_PLAN:
@@ -177,15 +200,20 @@ class StatelessAgentFlow:
                 result_column_names = []
                 result_rows = []
 
-                _, geos, _ = await plan_agent.achat(
-                    necessary_info=self.user_info,
-                    chat_history=self.chat_history,
-                    summary=summary_resp,
-                    user_content=user_content,
-                    str_list=sql_stmts,
-                    result_column_names=result_column_names,
-                    result_rows=result_rows,
-                )
+                try:
+                    _, geos, _ = await self.plan_agent.achat(
+                        necessary_info=self.user_info,
+                        chat_history=self.chat_history,
+                        summary=summary_resp,
+                        user_content=user_content,
+                        str_list=sql_stmts,
+                        result_column_names=result_column_names,
+                        result_rows=result_rows,
+                    )
+                except Exception as e:
+                    chat_resp.success = False
+                    chat_resp.reply = str(e)
+                    return None, chat_resp
 
                 # chat_resp.reply = self.chat_history[-1]
                 chat_resp.need_reset = True
@@ -210,4 +238,3 @@ class StatelessAgentFlow:
                 chat_resp.score = self.user_info[self.score_name]
                 chat_resp.season = self.user_info[self.season_name]
                 return None, chat_resp
-        

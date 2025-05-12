@@ -19,6 +19,11 @@ folium = "^0.18.0"
 streamlit-folium = "^0.23.1"
 
 
+[[tool.poetry.source]]
+name = "mirrors"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+priority = "primary"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
