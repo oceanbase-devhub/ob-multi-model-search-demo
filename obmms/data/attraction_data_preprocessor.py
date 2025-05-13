@@ -73,20 +73,30 @@ def parse_season_str(season_str: str) -> int:
 
 
 def create_obmms_table():
-    connect_args = {
-        "ssl_ca": os.getenv("OB_DB_SSL_CA_PATH", ""),
-    }
+    ssl_ca_path = os.getenv("OB_DB_SSL_CA_PATH")
+    if ssl_ca_path is not None:
+        connect_args = {
+            "ssl_ca": ssl_ca_path,
+        }
     uri = os.getenv("OB_URL", "127.0.0.1:2881")
     user = os.getenv("OB_USER", "root@test")
     db_name = os.getenv("OB_DB_NAME", "test")
     pwd = os.getenv("OB_PWD", "")
-    client = ObVecClient(
-        uri=uri,
-        user=user,
-        password=pwd,
-        db_name=db_name,
-        connect_args=connect_args,
-    )
+    if ssl_ca_path:
+        client = ObVecClient(
+            uri=uri,
+            user=user,
+            password=pwd,
+            db_name=db_name,
+            connect_args=connect_args,
+        )
+    else:
+        client = ObVecClient(
+            uri=uri,
+            user=user,
+            password=pwd,
+            db_name=db_name,
+        )
     if client.check_table_exists(table_name=DEFAULT_OBMMS_TABLE_NAME):
         return
     
@@ -126,20 +136,30 @@ def create_obmms_table():
 
 
 def load_csv(csv_path: str, delete_after_loaded: bool = False):
-    connect_args = {
-        "ssl_ca": os.getenv("OB_DB_SSL_CA_PATH", "")
-    }
+    ssl_ca_path = os.getenv("OB_DB_SSL_CA_PATH")
+    if ssl_ca_path is not None:
+        connect_args = {
+            "ssl_ca": ssl_ca_path,
+        }
     uri = os.getenv("OB_URL", "127.0.0.1:2881")
     user = os.getenv("OB_USER", "root@test")
     db_name = os.getenv("OB_DB_NAME", "test")
     pwd = os.getenv("OB_PWD", "")
-    client = ObVecClient(
-        uri=uri,
-        user=user,
-        password=pwd,
-        db_name=db_name,
-        connect_args=connect_args,
-    )
+    if ssl_ca_path:
+        client = ObVecClient(
+            uri=uri,
+            user=user,
+            password=pwd,
+            db_name=db_name,
+            connect_args=connect_args,
+        )
+    else:
+        client = ObVecClient(
+            uri=uri,
+            user=user,
+            password=pwd,
+            db_name=db_name,
+        )
     df = pd.read_csv(csv_path)
 
     pattern = r'地址:\n(.*?)\n'

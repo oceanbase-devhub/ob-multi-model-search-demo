@@ -38,24 +38,35 @@ class ObMMSTool(Tool):
         **kwargs,
     ):
         self.table_name = table_name
-        connect_args = {
-            "ssl": {
-                "ca": os.getenv("OB_DB_SSL_CA_PATH", ""),
-                "check_hostname": False,
+        ssl_ca_path = os.getenv("OB_DB_SSL_CA_PATH")
+        if ssl_ca_path:
+            connect_args = {
+                "ssl": {
+                    "ca": ssl_ca_path,
+                    "check_hostname": False,
+                }
             }
-        }
         uri = os.getenv("OB_URL", "127.0.0.1:2881")
         user = os.getenv("OB_USER", "root@test")
         db_name = os.getenv("OB_DB_NAME", "test")
         pwd = os.getenv("OB_PWD", "")
-        self.client = ObVecClient(
-            uri=uri,
-            user=user,
-            password=pwd,
-            db_name=db_name,
-            connect_args=connect_args,
-            echo=echo, **kwargs
-        )
+        if ssl_ca_path:
+            self.client = ObVecClient(
+                uri=uri,
+                user=user,
+                password=pwd,
+                db_name=db_name,
+                connect_args=connect_args,
+                echo=echo, **kwargs
+            )
+        else:
+            self.client = ObVecClient(
+                uri=uri,
+                user=user,
+                password=pwd,
+                db_name=db_name,
+                echo=echo, **kwargs
+            )
         self.topk = topk
         self.departure_name = departure_name
         self.distance_name = distance_name
