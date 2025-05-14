@@ -27,7 +27,7 @@ logger.setLevel(level=logging.INFO)
 def geocode(address):
     params = {
         'address': address,
-        'key': os.environ.get("AMAP_API_KEY", ""),
+        'key': os.getenv("AMAP_API_KEY", ""),
     }
     url = 'https://restapi.amap.com/v3/geocode/geo'
 
@@ -49,6 +49,7 @@ def embedding(query: List[str]):
     res = dashscope.TextEmbedding.call(
         model=dashscope.TextEmbedding.Models.text_embedding_v3,
         input=query,
+        api_key=os.getenv("DASHSCOPE_API_KEY"),
     )
     if res.status_code == HTTPStatus.OK:
         return [eb['embedding'] for eb in res.output['embeddings']]
