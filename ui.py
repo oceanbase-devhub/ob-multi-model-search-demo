@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 from obmms import AgentFlow
+import dotenv
+
+dotenv.load_dotenv()
 
 st.set_page_config(
     page_title="旅行规划助手",
