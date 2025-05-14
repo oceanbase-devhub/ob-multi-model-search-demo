@@ -72,12 +72,17 @@ class ObMMSTool(Tool):
         self.distance_name = distance_name
         self.score_name = score_name
         self.season_name = season_name
+        self.embed_api_key = os.getenv("DASHSCOPE_API_KEY")
+        self.amap_api_key = os.getenv("AMAP_API_KEY")
+        if self.embed_api_key is None or self.amap_api_key is None:
+            raise ValueError("embed_api_key or amap_api_key is None")
     
     @classmethod
     def embedding(cls, query: str):
         res = dashscope.TextEmbedding.call(
             model=dashscope.TextEmbedding.Models.text_embedding_v3,
             input=[query],
+            api_key=os.getenv("DASHSCOPE_API_KEY"),
         )
         if res.status_code == HTTPStatus.OK:
             return [eb['embedding'] for eb in res.output['embeddings']][0]
@@ -105,7 +110,7 @@ class ObMMSTool(Tool):
     def geocode(cls, address):
         params = {
             'address': address,
-            'key': os.environ.get("AMAP_API_KEY", ""),
+            'key': os.getenv("AMAP_API_KEY", ""),
         }
         url = 'https://restapi.amap.com/v3/geocode/geo'
         while True:
