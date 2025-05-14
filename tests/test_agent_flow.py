@@ -17,7 +17,7 @@ class AgentFlowTest(unittest.TestCase):
 
         while True:
             user_input = input("> ")
-            resp, _ = agent_flow.chat(user_content=user_input)
+            resp, _, _, _, _, _ = agent_flow.chat(user_content=user_input)
             print("===================================\n")
             for res in resp:
                 print(res.output.choices[0].message.content, end='', flush=True)

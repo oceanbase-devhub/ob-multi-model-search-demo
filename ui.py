@@ -61,8 +61,6 @@ with col2:
             st.chat_message("user", avatar=avatar_m["user"]).write(prompt)
             
             resp, geo, _, _, _, _ = st.session_state["agents"].chat(user_content=prompt)
-            while resp is None:
-                resp, geo, _, _, _, _ = st.session_state["agents"].chat(user_content=prompt)
             st.chat_message("assistant", avatar=avatar_m["assistant"]).write_stream(
                 gen_stream_resp(resp, msg)
             )

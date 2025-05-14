@@ -138,7 +138,7 @@ class AgentFlow:
                 )
                 self.update_user_info(new_json=new_json)
                 self.set_next_stat()
-                yield None, None, f"抽取必要查询信息（{time.time() - start_time:.2f}s）", None, None, None
+                # yield None, None, f"抽取必要查询信息（{time.time() - start_time:.2f}s）", None, None, None
             elif self.stat == AgentStat.STAT_CONSULT:
                 logger.info(f"################### current undefined keys: {self.get_none_user_info_keys()}")
                 start_time = time.time()
@@ -153,7 +153,7 @@ class AgentFlow:
                     geo = None
                 else:
                     geo = [self.obmms_tool.geocode(self.user_info[self.departure_name])]
-                yield resp, geo, f"询问用户必要需求（{time.time() - start_time:.2f}s）", None, None, None
+                return resp, geo, f"询问用户必要需求（{time.time() - start_time:.2f}s）", None, None, None
             elif self.stat == AgentStat.STAT_SUMMARY:
                 start_time = time.time()
                 summary_resp = self.summary_agent.chat(
@@ -162,7 +162,7 @@ class AgentFlow:
                 )
                 print(f"===================== summary ==================\n {summary_resp}\n ===============================\n")
                 self.set_next_stat()
-                yield None, None, f"分析用户其他需求（{time.time() - start_time:.2f}s）", None, None, None
+                # yield None, None, f"分析用户其他需求（{time.time() - start_time:.2f}s）", None, None, None
             elif self.stat == AgentStat.STAT_PLAN:
                 sql_stmts = []
                 result_column_names = []
@@ -177,4 +177,4 @@ class AgentFlow:
                     result_rows=result_rows,
                 )
                 self.set_next_stat()
-                yield resp, geos, f"生成景点推荐（{time.time() - start_time:.2f}s）", [f"（{duration:.2f}s）: {sql_stmts[0]}"], result_column_names, result_rows
+                return resp, geos, f"生成景点推荐（{time.time() - start_time:.2f}s）", [f"（{duration:.2f}s）: {sql_stmts[0]}"], result_column_names, result_rows
