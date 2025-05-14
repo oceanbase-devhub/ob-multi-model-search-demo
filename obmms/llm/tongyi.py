@@ -4,8 +4,10 @@ import dashscope
 from typing import List
 from .llm import LLM, LLMConfig
 import logging
+import dotenv
 
 logger = logging.getLogger(__name__)
+dotenv.load_dotenv()
 
 class TongyiLLMConfig(LLMConfig):
     """"""
